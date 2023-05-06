@@ -100,7 +100,6 @@ impl Scanner {
         }
 
         while let Some(c) = iter_chars.next() {
-            println!("c: {}", c);
             match c {
                 '(' => tokens.push(TokenType::LeftParen),
                 ')' => tokens.push(TokenType::RightParen),

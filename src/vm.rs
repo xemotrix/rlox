@@ -44,7 +44,6 @@ impl VM {
 
         loop {
             let op = &self.chunk.code[self.ip];
-            println!("OP: {}", op);
             match op {
                 Op::Nop => {
                     return InterpretResult::InterpretOk;

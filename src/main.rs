@@ -13,12 +13,13 @@ use value::Value;
 use vm::VM;
 
 fn main() {
-    // dummy_test();
-    // let line = "1 + 2 * 3";
     let line = "1 + 2 * 3";
+    println!("Line: '{}'", line);
+
     let mut tokens = Scanner::new(line).scan_tokens();
 
-    println!("Tokens: {:#?}", tokens);
+    println!("Tokens:");
+    tokens.iter().enumerate().for_each(|(i, token)| println!("{:>2} -> {:?}", i, token));
     
     tokens.push(token::TokenType::Eof);
 
@@ -30,6 +31,7 @@ fn main() {
 
     chunk.write_chunk(Op::Dump, 123);
 
+    println!();
     chunk.dissassemble_chunk("test chunk");
 
     let mut vm = VM::new();
