@@ -13,7 +13,7 @@ use value::Value;
 use vm::VM;
 
 fn main() {
-    let line = "1 + 2 * 3";
+    let line = "(1 + 2) * 3";
     println!("Line: '{}'", line);
 
     let mut tokens = Scanner::new(line).scan_tokens();

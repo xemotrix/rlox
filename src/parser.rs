@@ -65,9 +65,15 @@ impl Parser {
         }
 
     }
+
     fn unary(&mut self) {
         todo!()
     }
+
+    fn grouping(&mut self) {
+        self.expression();
+    }
+
     fn binary(&mut self) {
 
         let operator_type = self.prev().clone();
@@ -131,6 +137,7 @@ enum RuleFunc {
     Number,
     Unary,
     Binary,
+    Grouping,
 }
 
 impl RuleFunc {
@@ -139,6 +146,7 @@ impl RuleFunc {
             Self::Number => Parser::number(p),
             Self::Unary => Parser::unary(p),
             Self::Binary => Parser::binary(p),
+            Self::Grouping => Parser::grouping(p),
         }
     }
 }
@@ -152,11 +160,11 @@ struct ParseRule {
 
 fn parse_rules(t: &TokenType) -> ParseRule {
     match t {
-        // TokenType::LeftParen => ParseRule {
-        //     prefix: Some(|p| p.grouping()),
-        //     infix: None,
-        //     precedence: Precedence::None,
-        // },
+        TokenType::LeftParen => ParseRule {
+            prefix: Some(RuleFunc::Grouping),
+            infix: None,
+            precedence: Precedence::None,
+        },
         TokenType::Minus => ParseRule {
             prefix: Some(RuleFunc::Unary),
             infix: Some(RuleFunc::Binary),
