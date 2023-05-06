@@ -2,8 +2,7 @@ use crate::token::TokenType;
 use crate::value::Value;
 use crate::Op;
 
-use std::fmt::{Debug, Formatter};
-use std::mem::discriminant;
+use std::fmt::Debug;
 
 pub struct Parser {
     tokens: Vec<TokenType>,
@@ -25,7 +24,6 @@ impl Parser {
     }
 
     pub fn parse(&mut self) {
-        println!("Parsing...");
         self.expression()
     }
 
@@ -39,26 +37,15 @@ impl Parser {
 
     fn advance(&mut self) {
         self.prev = self.current;
-        
         self.current += 1;
-
-        if self.current == self.tokens.len() {
-            println!("We about to panic");
-        }
     }
 
     fn expression(&mut self) {
-        println!("Parsing expression...");
         self.parse_precedence(Precedence::Assignment);
     }
 
     fn parse_precedence(&mut self, precedence: Precedence) {
-        println!("Parsing precedence '{:?}'...", precedence);
         self.advance();
-        if self.current == self.tokens.len() {
-            println!("Reached end of tokens");
-            return;
-        }
 
         let prefix_rule = parse_rules(self.prev()).prefix;
 
@@ -66,54 +53,22 @@ impl Parser {
             println!("Error: Expected expression");
             return;
         }
+
         let prefix_rule = prefix_rule.unwrap();
 
-        println!("prev: {:?}, prefix rule: {:?}", self.prev(), prefix_rule);
         prefix_rule.func(self);
-
-        println!(
-            "while loop: '{:?}' <= '{:?}'",
-            precedence,
-            parse_rules(self.current()).precedence
-        );
-        
-        if self.current == self.tokens.len() {
-            println!("Reached end of tokens");
-            return;
-        }
 
         while precedence <= parse_rules(self.current()).precedence {
             self.advance();
-            println!("  - advanced to: {:?}", self.current());
             let infix_rule = parse_rules(self.prev()).infix.unwrap();
-            println!(
-                "  - Prev: '{:?}' -> infix rule: {:?}",
-                self.prev(),
-                infix_rule
-            );
             infix_rule.func(self)
         }
 
-        println!(
-            "ended while because precedence '{:?}' > '{:?}'",
-            precedence,
-            parse_rules(self.current()).precedence
-        );
-        println!(
-            "  current was {:?} with rule -> {:?}",
-            self.current(),
-            parse_rules(self.current())
-        );
     }
     fn unary(&mut self) {
-        println!("->unary");
         todo!()
     }
     fn binary(&mut self) {
-        println!("->binary");
-        println!("  .prev: {:?}", self.prev());
-        println!("  .prev rule: {:?}", parse_rules(self.prev()));
-        println!("  .prev precedence next: {:?}", parse_rules(self.prev()).precedence.next());
 
         let operator_type = self.prev().clone();
 
@@ -128,15 +83,10 @@ impl Parser {
             TokenType::Slash => self.ops.push(Op::Divide),
             _ => panic!("Expected operator, found: {:?}", self.prev()),
         }
-
-        println!("\tAdded OP: {:?}", self.ops.last().unwrap());
-
     }
     fn number(&mut self) {
-        println!("->number");
         if let TokenType::Number(n) = self.prev() {
             self.ops.push(Op::Constant(Value::Number(*n)));
-            println!("\tAdded OP: {:?}", self.ops.last().unwrap());
             return;
         }
         panic!("Expected number");
