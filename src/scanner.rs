@@ -171,6 +171,7 @@ impl Scanner {
                 }
             }
         }
+        tokens.push(TokenType::Eof);
         tokens
     }
 }

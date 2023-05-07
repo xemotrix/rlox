@@ -5,6 +5,7 @@ mod scanner;
 mod token;
 mod value;
 mod vm;
+mod symtable;
 
 use chunk::Chunk;
 use op::Op;
@@ -13,21 +14,25 @@ use value::Value;
 use vm::VM;
 
 fn main() {
-    let line = "(1 + 2) * 3";
+    let line = r#""st" + "ri" + "ng""#;
     println!("Line: '{}'", line);
 
-    let mut tokens = Scanner::new(line).scan_tokens();
+    let tokens = Scanner::new(line).scan_tokens();
 
     println!("Tokens:");
-    tokens.iter().enumerate().for_each(|(i, token)| println!("{:>2} -> {:?}", i, token));
-    
-    tokens.push(token::TokenType::Eof);
+    tokens
+        .iter()
+        .enumerate()
+        .for_each(|(i, token)| println!("{:>2} -> {:?}", i, token));
 
     let mut parser = parser::Parser::new(tokens);
     parser.parse();
 
     let mut chunk = Chunk::new();
-    parser.ops.into_iter().for_each(|op| chunk.write_chunk(op, 1));
+    parser
+        .ops
+        .into_iter()
+        .for_each(|op| chunk.write_chunk(op, 1));
 
     chunk.write_chunk(Op::Dump, 123);
 

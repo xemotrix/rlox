@@ -10,8 +10,8 @@ pub struct VM {
 
 enum InterpretResult {
     InterpretOk,
-    CompileError,
-    RuntimeError,
+    CompileError(String),
+    RuntimeError(String),
 }
 
 impl VM {
@@ -23,25 +23,18 @@ impl VM {
         }
     }
     pub fn interpret(&mut self) {
-        self.run();
+        match self.run() {
+            InterpretResult::InterpretOk => {}
+            InterpretResult::CompileError(e) => {
+                println!("Compile error: {}", e);
+            }
+            InterpretResult::RuntimeError(e) => {
+                println!("Runtime error: {}", e);
+            }
+        }
     }
 
     fn run(&mut self) -> InterpretResult {
-        macro_rules! binOp {
-            ($op:tt) => {
-                let a = self.stack.pop();
-                let b = self.stack.pop();
-                match (a, b) {
-                    (Some(Value::Number(a)), Some(Value::Number(b))) => {
-                        self.stack.push(Value::Number(a $op b));
-                    },
-                    _ => {
-                        return InterpretResult::RuntimeError;
-                    }
-                }
-            }
-        }
-
         loop {
             let op = &self.chunk.code[self.ip];
             match op {
@@ -55,32 +48,100 @@ impl VM {
                     self.stack.push(constant.clone());
                 }
                 Op::Negate => {
-                    let m = self.stack.get_mut(0);
+                    let m = self.stack.last_mut();
                     match m {
                         Some(Value::Number(v)) => *v = -*v,
+                        Some(x) => {
+                            return InterpretResult::RuntimeError(format!("can't negate {:?}", x))
+                        }
                         None => {
-                            return InterpretResult::RuntimeError;
+                            return InterpretResult::RuntimeError("nothing to negate".to_string());
+                        }
+                    }
+                }
+                Op::Not => {
+                    let m = self.stack.last_mut();
+                    match m {
+                        Some(Value::Bool(v)) => *v = !*v,
+                        Some(x) => {
+                            return InterpretResult::RuntimeError(format!("can't negate {:?}", x))
+                        }
+                        None => {
+                            return InterpretResult::RuntimeError("nothing to negate".to_string());
                         }
                     }
                 }
                 Op::Add => {
-                    binOp!(+);
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Number(b + a)),
+                        (Some(Value::String(a)), Some(Value::String(b))) => self.stack.push(Value::String(format!("{}{}", b, a))),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '+' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
                 }
                 Op::Subtract => {
-                    binOp!(-);
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Number(b - a)),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '-' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
                 }
                 Op::Multiply => {
-                    binOp!(*);
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Number(b * a)),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '*' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
                 }
                 Op::Divide => {
-                    binOp!(/);
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Number(b / a)),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '/' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
                 }
+
+                Op::Greater => {
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Bool(b > a)),
+                        (Some(Value::String(a)), Some(Value::String(b))) => self.stack.push(Value::Bool(b > a)),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '>' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
+                }
+                Op::Less => {
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Bool(b < a)),
+                        (Some(Value::String(a)), Some(Value::String(b))) => self.stack.push(Value::Bool(b < a)),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '<' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
+                }
+                Op::Equal => {
+                    match (&self.stack.pop(), &self.stack.pop()) {
+                        (Some(Value::Bool(a)), Some(Value::Bool(b))) => self.stack.push(Value::Bool(b == a)),
+                        (Some(Value::Number(a)), Some(Value::Number(b))) => self.stack.push(Value::Bool(b == a)),
+                        (Some(Value::String(a)), Some(Value::String(b))) => self.stack.push(Value::Bool(b == a)),
+                        // (Some(_), Some(_)) => self.stack.push(Value::Bool(false)),
+                        (a, b) => return InterpretResult::RuntimeError(
+                            format!("tried to perform binop '==' but arguments are invalid: {:?} {:?}", a, b)
+                        )
+                    };
+
+                }
+
                 Op::Dump => match self.stack.last() {
                     Some(val) => {
-                        println!("{}", val);
+                        println!("{:?}", val);
                     }
                     None => {
-                        return InterpretResult::RuntimeError;
+                        return InterpretResult::RuntimeError("nothing to dump".to_string());
                     }
                 },
             }
