@@ -73,14 +73,22 @@ use vm::VM;
 
 fn main() {
     let line = r#"
-        if ( (4==4) and (5==5)) {
-            print "true";
-        } else {
-            print "false";
-        }
+    {
+        var a = 0;
+        var should_print = 0;
 
-        print "done";
+        while (a < 1000000) {
+            a = a + 1;
+            should_print = should_print + 1;
+
+            if (should_print == 100000) {
+                should_print = 0;
+                print a;
+            }
+        }
+    }
     "#;
+
     println!("Line: '{}'", line);
 
     let tokens = Scanner::new(line).scan_tokens();

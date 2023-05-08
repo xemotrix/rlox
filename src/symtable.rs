@@ -6,13 +6,14 @@ const MAX_LOADF: f64 = 0.75;
 
 
 use Entry::*;
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Entry {
     Empty,
     Tomb,
     Full(String, Value),
 }
 
+#[derive(Debug)]
 pub struct SymTable {
     table: Vec<Entry>,
     size: usize,

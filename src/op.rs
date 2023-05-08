@@ -21,6 +21,7 @@ pub enum Op {
     JumpIfFalse(usize),
     JumpIfTrue(usize),
     Jump(usize),
+    Loop(usize),
 
     Equal,
     Greater,
@@ -45,6 +46,7 @@ impl Display for Op {
             Op::JumpIfFalse(i) => write!(f, "{:>20} | {:?}", "OP_JUMP_IF_FALSE", i),
             Op::JumpIfTrue(i) => write!(f, "{:>20} | {:?}", "OP_JUMP_IF_TRUE", i),
             Op::Jump(i) => write!(f, "{:>20} | {:?}", "OP_JUMP", i),
+            Op::Loop(i) => write!(f, "{:>20} | {:?}", "OP_LOOP", i),
             Op::Divide => write!(f, "{:>20} |", "OP_DIVIDE"),
             Op::Equal => write!(f, "{:>20} |", "OP_EQUAL"),
             Op::Greater => write!(f, "{:>20} |", "OP_GREATER"),

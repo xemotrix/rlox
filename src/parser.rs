@@ -154,10 +154,36 @@ impl Parser {
                 self.advance();
                 self.if_statement();
             }
+            TokenType::While => {
+                self.advance();
+                self.while_statement();
+            },
             _ => {
                 self.expression_statement();
             },
         }
+    }
+
+    fn while_statement(&mut self) {
+        let loop_start = self.ops.len();
+        self.consume(TokenType::LeftParen);
+        self.expression();
+        self.consume(TokenType::RightParen);
+
+        self.ops.push(Op::JumpIfFalse(0));
+        let begin_loop_body = self.ops.len() - 1;
+        self.ops.push(Op::Pop);
+
+        self.statement();
+
+        let jump_offset = self.ops.len() - begin_loop_body;
+        if let Op::JumpIfFalse(ref mut offset) = self.ops[begin_loop_body] {
+            *offset = jump_offset;
+        } else { unreachable!() }
+
+        self.ops.push(Op::Loop(self.ops.len() - (loop_start - 1) ));
+        self.ops.push(Op::Pop);
+
     }
 
     fn if_statement(&mut self) {
@@ -169,9 +195,7 @@ impl Parser {
         let then_jump = self.ops.len() - 1;
         self.ops.push(Op::Pop);
 
-
         self.statement();
-        
 
         self.ops.push(Op::Jump(0));
         let else_jump = self.ops.len() - 1;
@@ -188,9 +212,9 @@ impl Parser {
         }
 
         
-        let aux = self.ops.len() - 1 - else_jump;
+        let jump_offset = self.ops.len() - 1 - else_jump;
         if let Op::Jump(ref mut offset) = self.ops[else_jump] {
-            *offset = aux;
+            *offset = jump_offset;
         } else { unreachable!() }
     }
 
@@ -510,12 +534,12 @@ fn parse_rules(t: &TokenType) -> ParseRule {
         TokenType::And => ParseRule {
             prefix: None,
             infix: Some(RuleFunc::And),
-            precedence: Precedence::None,
+            precedence: Precedence::And,
         },
         TokenType::Or => ParseRule {
             prefix: None,
             infix: Some(RuleFunc::Or),
-            precedence: Precedence::None,
+            precedence: Precedence::Or,
         },
         TokenType::Eof | TokenType::Semicolon | TokenType::Equal => ParseRule {
             prefix: None,

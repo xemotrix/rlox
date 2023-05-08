@@ -53,7 +53,6 @@ impl VM {
                         self.ip += offset;
                     }
                 }
-
                 Op::JumpIfTrue(offset) => {
                     if let Value::Bool(true) = self.stack.last().expect("stack is empty") {
                         self.ip += offset;
@@ -61,6 +60,9 @@ impl VM {
                 }
                 Op::Jump(offset) => {
                     self.ip += offset;
+                }
+                Op::Loop(offset) => {
+                    self.ip -= offset;
                 }
                 Op::GetGlobal(iden_str) => {
                     match self.symtable.get(iden_str.clone()) {
@@ -192,7 +194,13 @@ impl VM {
                     }
                 },
             }
-            // println!("inst {:?} stack: {:?}", op, self.stack);
+            // println!("\n{:04} {:?}",self.ip, op);
+            // println!("\tstack: {:?}", self.stack);
+            // println!("\tsymtable: {:?}", self.symtable);
+            // if self.stack.len() > 3 {
+            //     panic!("stack overflow");
+            // }
+
             self.ip += 1;
             if self.ip >= self.chunk.code.len() {
                 return InterpretResult::InterpretOk;
