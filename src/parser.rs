@@ -179,7 +179,7 @@ impl Parser {
 
         if let Op::JumpIfFalse(ref mut offset) = self.ops[then_jump] {
             *offset = else_jump - then_jump;
-        } else { panic!("{:?}", self.ops[then_jump]) }
+        } else { unreachable!() }
 
 
         if let TokenType::Else = self.current() {
@@ -191,6 +191,32 @@ impl Parser {
         let aux = self.ops.len() - 1 - else_jump;
         if let Op::Jump(ref mut offset) = self.ops[else_jump] {
             *offset = aux;
+        } else { unreachable!() }
+    }
+
+    fn and(&mut self) {
+        self.ops.push(Op::JumpIfFalse(0));
+        let jump = self.ops.len() - 1;
+        self.ops.push(Op::Pop);
+
+        self.parse_precedence(Precedence::And);
+
+        let off = self.ops.len() - 1 - jump;
+        if let Op::JumpIfFalse(ref mut offset) = self.ops[jump] {
+            *offset = off;
+        } else { unreachable!() }
+    }
+
+    fn or(&mut self) {
+        self.ops.push(Op::JumpIfTrue(0));
+        let jump = self.ops.len() - 1;
+        self.ops.push(Op::Pop);
+
+        self.parse_precedence(Precedence::And);
+
+        let off = self.ops.len() - 1 - jump;
+        if let Op::JumpIfTrue(ref mut offset) = self.ops[jump] {
+            *offset = off;
         } else { unreachable!() }
     }
 
@@ -338,6 +364,7 @@ impl Parser {
             .find(|(_, local)| local.name == name)
             .map(|(i, _)| i)
     }
+
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -382,6 +409,8 @@ enum RuleFunc {
     Binary,
     Grouping,
     String,
+    And,
+    Or,
 }
 
 impl RuleFunc {
@@ -394,6 +423,8 @@ impl RuleFunc {
             Self::Binary => Parser::binary(p),
             Self::Grouping => Parser::grouping(p),
             Self::String => Parser::string(p),
+            Self::And => Parser::and(p),
+            Self::Or => Parser::or(p),
         }
     }
 }
@@ -466,20 +497,26 @@ fn parse_rules(t: &TokenType) -> ParseRule {
                 precedence: Precedence::Comparison,
             }
         }
-        TokenType::Identifier(_) => {
-            ParseRule {
-                prefix: Some(RuleFunc::Variable),
-                infix: None,
-                precedence: Precedence::None,
-            }
-        }
-        TokenType::String(_) => {
-            ParseRule {
-                prefix: Some(RuleFunc::String),
-                infix: None,
-                precedence: Precedence::None,
-            }
-        }
+        TokenType::Identifier(_) =>  ParseRule {
+            prefix: Some(RuleFunc::Variable),
+            infix: None,
+            precedence: Precedence::None,
+        },
+        TokenType::String(_) => ParseRule {
+            prefix: Some(RuleFunc::String),
+            infix: None,
+            precedence: Precedence::None,
+        },
+        TokenType::And => ParseRule {
+            prefix: None,
+            infix: Some(RuleFunc::And),
+            precedence: Precedence::None,
+        },
+        TokenType::Or => ParseRule {
+            prefix: None,
+            infix: Some(RuleFunc::Or),
+            precedence: Precedence::None,
+        },
         TokenType::Eof | TokenType::Semicolon | TokenType::Equal => ParseRule {
             prefix: None,
             infix: None,

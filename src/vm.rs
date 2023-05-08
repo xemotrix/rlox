@@ -53,6 +53,12 @@ impl VM {
                         self.ip += offset;
                     }
                 }
+
+                Op::JumpIfTrue(offset) => {
+                    if let Value::Bool(true) = self.stack.last().expect("stack is empty") {
+                        self.ip += offset;
+                    }
+                }
                 Op::Jump(offset) => {
                     self.ip += offset;
                 }

@@ -73,7 +73,7 @@ use vm::VM;
 
 fn main() {
     let line = r#"
-        if (false) {
+        if ( (4==4) and (5==5)) {
             print "true";
         } else {
             print "false";
