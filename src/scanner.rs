@@ -163,7 +163,7 @@ impl Scanner {
                         || **chr == '_')));
                 }
 
-                ' ' | '\r' | '\t' => {}
+                ' ' | '\r' | '\t' | '\n' => {}
 
                 _ => {
                     tokens.push(TokenType::Error);

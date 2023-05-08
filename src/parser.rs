@@ -8,7 +8,16 @@ pub struct Parser {
     tokens: Vec<TokenType>,
     prev: usize,
     current: usize,
+    scope_depth: i32,
+    local_count: usize,
+    locals: Vec<Local>,
     pub ops: Vec<Op>,
+}
+
+#[derive(Debug)]
+struct Local {
+    name: String,
+    depth: i32,
 }
 
 impl Parser {
@@ -17,12 +26,20 @@ impl Parser {
             tokens,
             prev: 0,
             current: 0,
+            scope_depth: 0,
+            local_count: 0,
+            locals: Vec::new(),
             ops: Vec::new(),
         }
     }
 
-    pub fn parse(&mut self) {
-        self.expression()
+    pub fn compile(&mut self) {
+        loop {
+            match self.current() {
+                TokenType::Eof => break,
+                _ => self.declaration(),
+            }
+        }
     }
 
     pub fn consume(&mut self, tt: TokenType) {
@@ -48,23 +65,167 @@ impl Parser {
 
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
-
         let prefix_rule = parse_rules(self.prev()).prefix;
-
         if prefix_rule.is_none() {
             println!("Error: Expected expression");
             return;
         }
 
         let prefix_rule = prefix_rule.unwrap();
-
-        prefix_rule.parse(self);
-
+        let can_assign = precedence <= Precedence::Assignment;
+        prefix_rule.parse(self, can_assign);
         while precedence <= parse_rules(self.current()).precedence {
             self.advance();
             let infix_rule = parse_rules(self.prev()).infix.unwrap();
-            infix_rule.parse(self)
+            infix_rule.parse(self, can_assign)
         }
+
+        if can_assign {
+            if let TokenType::Equal = self.current() {
+                println!("Error: Invalid assignment target.");
+            }
+        }
+    }
+
+    fn declaration(&mut self) {
+        match self.current() {
+            TokenType::Var => {
+                self.advance();
+                self.var_declaration();
+            },
+            _ => {
+                self.statement();
+            },
+        }
+    }
+
+    fn var_declaration(&mut self) {
+        match self.current() {
+            TokenType::Identifier(iden) => {
+                let iden_str = iden.clone();
+                self.advance();
+                self.consume(TokenType::Equal);
+                self.expression();
+                self.consume(TokenType::Semicolon);
+
+                if self.scope_depth > 0 {
+                    self.add_local(iden_str);
+                    return;
+                }
+
+                self.ops.push(Op::DefineGlobal(iden_str));
+            },
+            _ => {
+                println!("Error: Expected identifier");
+            },
+        }
+    }
+
+    fn add_local(&mut self, iden: String) {
+        for local in self.locals.iter().rev() {
+            if local.depth < self.scope_depth {
+                break;
+            }
+            if local.name == iden {
+                println!("Error: Already variable with this name in this scope.");
+            }
+        }
+
+        self.local_count += 1;
+        self.locals.push(Local {
+            name: iden,
+            depth: self.scope_depth,
+        });
+    }
+
+    fn statement(&mut self) {
+        match self.current() {
+            TokenType::Print => {
+                self.advance();
+                self.print_statement();
+            },
+            TokenType::LeftBrace => {
+                self.advance();
+                self.begin_scope();
+                self.block();
+                self.end_scope();
+            },
+            TokenType::If => {
+                self.advance();
+                self.if_statement();
+            }
+            _ => {
+                self.expression_statement();
+            },
+        }
+    }
+
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LeftParen);
+        self.expression();
+        self.consume(TokenType::RightParen);
+
+        self.ops.push(Op::JumpIfFalse(0));
+        let then_jump = self.ops.len() - 1;
+        self.ops.push(Op::Pop);
+
+
+        self.statement();
+        
+
+        self.ops.push(Op::Jump(0));
+        let else_jump = self.ops.len() - 1;
+        self.ops.push(Op::Pop);
+
+        if let Op::JumpIfFalse(ref mut offset) = self.ops[then_jump] {
+            *offset = else_jump - then_jump;
+        } else { panic!("{:?}", self.ops[then_jump]) }
+
+
+        if let TokenType::Else = self.current() {
+            self.advance();
+            self.statement();
+        }
+
+        
+        let aux = self.ops.len() - 1 - else_jump;
+        if let Op::Jump(ref mut offset) = self.ops[else_jump] {
+            *offset = aux;
+        } else { unreachable!() }
+    }
+
+    fn block(&mut self) {
+        loop {
+            match self.current() {
+                TokenType::RightBrace | TokenType::Eof =>  break,
+                _ => self.declaration(),
+            }
+        }
+        self.consume(TokenType::RightBrace);
+    }
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+	}
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+
+        while self.local_count > 0 && self.locals.last().unwrap().depth > self.scope_depth {
+            self.local_count -= 1;
+            self.locals.pop();
+            self.ops.push(Op::Pop);
+        }
+	}
+
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon);
+        self.ops.push(Op::Pop);
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon);
+        self.ops.push(Op::Print);
     }
 
     fn expression(&mut self) {
@@ -138,6 +299,45 @@ impl Parser {
         }
         panic!("Expected string");
     }
+
+    fn variable(&mut self, can_assign: bool) {
+        self.named_variable(can_assign);
+    }
+
+    fn named_variable(&mut self, can_assign: bool) {
+        let iden = match self.prev() {
+            TokenType::Identifier(iden) =>  iden.clone(),
+            _ => panic!("Expected identifier"),
+        };
+
+        let (set_op, get_op) = match self.resolve_local(&iden) {
+            Some(local) => {
+                (Op::SetLocal(local), Op::GetLocal(local))
+            },
+            None => {
+                (Op::SetGlobal(iden.clone()), Op::GetGlobal(iden))
+            },
+        };
+
+        match self.current() {
+            TokenType::Equal if can_assign => {
+                self.advance();
+                self.expression();
+                self.ops.push(set_op);
+            },
+            _ => {
+                self.ops.push(get_op);
+            },
+        }
+    }
+
+    fn resolve_local(&mut self, name: &str) -> Option<usize>{
+        self.locals.iter()
+            .enumerate()
+            .rev()
+            .find(|(_, local)| local.name == name)
+            .map(|(i, _)| i)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -177,6 +377,7 @@ impl Precedence {
 enum RuleFunc {
     Number,
     Literal,
+    Variable,
     Unary,
     Binary,
     Grouping,
@@ -184,9 +385,10 @@ enum RuleFunc {
 }
 
 impl RuleFunc {
-    fn parse(&self, p: &mut Parser) {
+    fn parse(&self, p: &mut Parser, can_assign: bool) {
         match self {
             Self::Number => Parser::number(p),
+            Self::Variable => Parser::variable(p, can_assign),
             Self::Literal => Parser::literal(p),
             Self::Unary => Parser::unary(p),
             Self::Binary => Parser::binary(p),
@@ -264,6 +466,13 @@ fn parse_rules(t: &TokenType) -> ParseRule {
                 precedence: Precedence::Comparison,
             }
         }
+        TokenType::Identifier(_) => {
+            ParseRule {
+                prefix: Some(RuleFunc::Variable),
+                infix: None,
+                precedence: Precedence::None,
+            }
+        }
         TokenType::String(_) => {
             ParseRule {
                 prefix: Some(RuleFunc::String),
@@ -271,12 +480,14 @@ fn parse_rules(t: &TokenType) -> ParseRule {
                 precedence: Precedence::None,
             }
         }
-        TokenType::Eof => ParseRule {
+        TokenType::Eof | TokenType::Semicolon | TokenType::Equal => ParseRule {
             prefix: None,
             infix: None,
             precedence: Precedence::None,
         },
-
-        _ => unimplemented!(),
+        t => {
+            println!("Unknown token: {:?}", t);
+            unimplemented!();
+        }
     }
 }

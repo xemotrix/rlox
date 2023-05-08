@@ -10,7 +10,12 @@ pub enum Value {
 
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Value::Number(n) => write!(f, "{}", n),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::String(s) => write!(f, "{}", s),
+            Value::Nil => write!(f, "nil"),
+        }
     }
 }
 

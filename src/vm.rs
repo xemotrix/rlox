@@ -1,10 +1,12 @@
 use crate::chunk::Chunk;
 use crate::op::Op;
 use crate::value::Value;
+use crate::symtable::SymTable;
 
 pub struct VM {
     pub chunk: Chunk,
     stack: Vec<Value>,
+    symtable: SymTable,
     ip: usize,
 }
 
@@ -18,8 +20,9 @@ impl VM {
     pub fn new() -> VM {
         VM {
             chunk: Chunk::new(),
-            ip: 0,
             stack: Vec::new(),
+            symtable: SymTable::new(),
+            ip: 0,
         }
     }
     pub fn interpret(&mut self) {
@@ -35,6 +38,7 @@ impl VM {
     }
 
     fn run(&mut self) -> InterpretResult {
+        println!("\nRunning...");
         loop {
             let op = &self.chunk.code[self.ip];
             match op {
@@ -43,6 +47,43 @@ impl VM {
                 }
                 Op::Return => {
                     return InterpretResult::InterpretOk;
+                }
+                Op::JumpIfFalse(offset) => {
+                    if let Value::Bool(false) = self.stack.last().expect("stack is empty") {
+                        self.ip += offset;
+                    }
+                }
+                Op::Jump(offset) => {
+                    self.ip += offset;
+                }
+                Op::GetGlobal(iden_str) => {
+                    match self.symtable.get(iden_str.clone()) {
+                        Some(v) => self.stack.push(v),
+                        None => return InterpretResult::RuntimeError(format!("undefined variable '{}'", iden_str)),
+                    }
+                }
+                Op::SetGlobal(iden_str) => {
+                    let iden = iden_str.clone();
+                    let overwrited = self.symtable.set(
+                        iden.clone(), 
+                        self.stack.last().expect("stack is empty").clone()
+                    );
+                    if !overwrited {
+                        self.symtable.delete(iden_str).expect("can't delete");
+                        return InterpretResult::RuntimeError(format!("undefined variable '{}'", iden_str));
+                    }
+                }
+                Op::SetLocal(idx) => {
+                    self.stack[*idx] = self.stack.last().expect("stack is empty").clone();
+                }
+                Op::GetLocal(idx) => {
+                    self.stack.push(self.stack[*idx].clone());
+                }
+                Op::DefineGlobal(iden_str) => {
+                    self.symtable.set(iden_str.clone(), self.stack.pop().expect("stack is empty"));
+                }
+                Op::Pop => {
+                    self.stack.pop();
                 }
                 Op::Constant(constant) => {
                     self.stack.push(constant.clone());
@@ -136,15 +177,16 @@ impl VM {
 
                 }
 
-                Op::Dump => match self.stack.last() {
-                    Some(val) => {
-                        println!("{:?}", val);
+                Op::Print => match self.stack.last() {
+                    Some(_) => {
+                        println!("{}", self.stack.pop().unwrap());
                     }
                     None => {
                         return InterpretResult::RuntimeError("nothing to dump".to_string());
                     }
                 },
             }
+            // println!("inst {:?} stack: {:?}", op, self.stack);
             self.ip += 1;
             if self.ip >= self.chunk.code.len() {
                 return InterpretResult::InterpretOk;

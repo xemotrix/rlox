@@ -13,29 +13,30 @@ enum Entry {
     Full(String, Value),
 }
 
-struct SymTable {
+pub struct SymTable {
     table: Vec<Entry>,
     size: usize,
 }
 
 #[allow(dead_code)]
 impl SymTable {
-    fn new() -> Self {
+    pub fn new() -> Self {
         SymTable {
             table: vec![Empty; 8],
             size: 0,
         }
     }
 
-    fn set(&mut self, key: String, value: Value) {
+    pub fn set(&mut self, key: String, value: Value) -> bool {
         let (index, has_item) = Self::find_entry(&self.table, &key);
         if !has_item {
             self.size += 1;
         }
         self.table[index] = Full(key, value);
+        has_item
     }
 
-    fn get(&mut self, key: String) -> Option<Value> {
+    pub fn get(&mut self, key: String) -> Option<Value> {
         if self.size == 0 {
             return None;
         }
@@ -51,7 +52,7 @@ impl SymTable {
         unreachable!()
     }
 
-    fn delete(&mut self, key: String) -> Result<()> {
+    pub fn delete(&mut self, key: &String) -> Result<()> {
         if self.size == 0 {
             anyhow::bail!("table is empty");
         }
@@ -109,12 +110,12 @@ impl SymTable {
     }
 
     fn hash_key(token: &str) -> u32 {
-        let mut hash = 2166136261u32;
+        let mut hash = std::num::Wrapping(2166136261u32);
         for c in token.bytes() {
             hash ^= c as u32;
             hash *= 16777619;
         }
-        hash
+        hash.0
     }
 }
 
