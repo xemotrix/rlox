@@ -71,19 +71,48 @@ use vm::VM;
     // }
     // "#;
 
+    // let line = r#"
+    // {
+    //     var a = 0;
+    //     var should_print = 0;
+
+    //     while (a < 1000000) {
+    //         a = a + 1;
+    //         should_print = should_print + 1;
+
+    //         if (should_print == 100000) {
+    //             should_print = 0;
+    //             print a;
+    //         }
+    //     }
+    // }
+    // "#;
+
 fn main() {
     let line = r#"
     {
+        // god forgive me
         var a = 0;
-        var should_print = 0;
-
-        while (a < 1000000) {
+        var fizzer = 0;
+        var buzzer = 0;
+        while (a < 30) {
             a = a + 1;
-            should_print = should_print + 1;
+            fizzer = fizzer + 1;
+            buzzer = buzzer + 1;
 
-            if (should_print == 100000) {
-                should_print = 0;
+            if (fizzer != 3 and buzzer != 5) {
                 print a;
+            } else {
+                var msg = "";
+                if (fizzer == 3) {
+                    msg = msg + "Fizz";
+                    fizzer = 0;
+                } 
+                if (buzzer == 5) {
+                    msg = msg + "Buzz";
+                    buzzer = 0;
+                }
+                print msg;
             }
         }
     }
